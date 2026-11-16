@@ -43,6 +43,6 @@ fun priorityLabel(priority: String): String = when (priority) {
 }
 
 val taskFilterLabels = linkedMapOf(
-    "ALL" to "Todas", "TODAY" to "Hoje", "TOMORROW" to "Amanhã", "UPCOMING" to "Próximos dias",
+    "ALL" to "Todas", "PENDING" to "Pendentes", "PRIORITY" to "Prioritárias", "TODAY" to "Hoje", "TOMORROW" to "Amanhã", "UPCOMING" to "Próximos dias",
     "WEEK" to "Esta semana", "OVERDUE" to "Atrasadas", "COMPLETED" to "Concluídas", "UNDATED" to "Sem data"
 )

@@ -48,14 +48,14 @@ import java.util.Locale
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile("Pendentes", summary.pending, Icons.Outlined.Checklist, Modifier.weight(1f)) { onFilter("ALL") }
+                StatTile("Pendentes", summary.pending, Icons.Outlined.Checklist, Modifier.weight(1f)) { onFilter("PENDING") }
                 StatTile("Atrasadas", summary.overdue, Icons.Outlined.Schedule, Modifier.weight(1f)) { onFilter("OVERDUE") }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatTile("Concluídas", summary.completed, Icons.Outlined.TaskAlt, Modifier.weight(1f)) { onFilter("COMPLETED") }
-                StatTile("Prioritárias", summary.priority, Icons.Outlined.Flag, Modifier.weight(1f)) { onFilter("TODAY") }
+                StatTile("Prioritárias", summary.priority, Icons.Outlined.Flag, Modifier.weight(1f)) { onFilter("PRIORITY") }
             }
         }
         item {

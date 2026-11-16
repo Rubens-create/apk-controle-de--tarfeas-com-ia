@@ -30,7 +30,12 @@ import java.time.*
     val snackbars = remember { SnackbarHostState() }
     var now by remember { mutableStateOf(ZonedDateTime.now(ZoneId.of(settings.zoneId))) }
     LaunchedEffect(settings.zoneId) { while (true) { now = ZonedDateTime.now(ZoneId.of(settings.zoneId)); delay(30_000) } }
-    LaunchedEffect(notice) { notice?.let { vm.notice.value = null; snackbars.showSnackbar(it) } }
+    LaunchedEffect(notice) {
+        notice?.let {
+            snackbars.showSnackbar(it)
+            if (vm.notice.value == it) vm.notice.value = null
+        }
+    }
     val tabs = listOf("home" to "Início", "tasks" to "Tarefas", "chat" to "Assistente", "calendar" to "Calendário", "more" to "Mais")
     val icons = listOf(Icons.Outlined.SpaceDashboard, Icons.Outlined.Checklist, Icons.Outlined.AutoAwesome, Icons.Outlined.CalendarMonth, Icons.Outlined.GridView)
     val subpage = route !in tabs.map { it.first }

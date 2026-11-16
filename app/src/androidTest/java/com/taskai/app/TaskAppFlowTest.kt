@@ -56,6 +56,7 @@ class TaskAppFlowTest {
             app.repository.createTask(com.taskai.app.data.TaskEntity(title = "Baixa hoje", priority = "BAIXA", dueDate = java.time.LocalDate.now().toString()))
         }
         compose.onNodeWithText("Prioritárias").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Urgente amanhã").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Urgente amanhã").assertIsDisplayed()
         compose.onNodeWithText("Baixa hoje").assertDoesNotExist()
     }

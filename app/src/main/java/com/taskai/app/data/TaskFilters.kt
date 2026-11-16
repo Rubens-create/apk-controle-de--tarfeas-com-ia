@@ -7,13 +7,15 @@ import java.time.temporal.TemporalAdjusters
 object TaskFilters {
     /** ALL includes history. Date views contain only pending tasks; WEEK is Monday through Sunday. */
     fun apply(tasks: List<TaskEntity>, filter: String, today: LocalDate): List<TaskEntity> {
-        require(filter in setOf("ALL", "TODAY", "TOMORROW", "UPCOMING", "WEEK", "OVERDUE", "COMPLETED", "UNDATED")) { "Filtro de tarefas inválido." }
+        require(filter in setOf("ALL", "PENDING", "PRIORITY", "TODAY", "TOMORROW", "UPCOMING", "WEEK", "OVERDUE", "COMPLETED", "UNDATED")) { "Filtro de tarefas inválido." }
         val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         return tasks.filter { task ->
             val date = task.dueDate?.let(TaskRules::parseDate)
             when (filter) {
                 "ALL" -> true
                 "COMPLETED" -> task.status == "COMPLETED"
+                "PENDING" -> task.status == "PENDING"
+                "PRIORITY" -> task.status == "PENDING" && task.priority in setOf("ALTA", "URGENTE")
                 else -> task.status == "PENDING" && when (filter) {
                     "TODAY" -> date == today
                     "TOMORROW" -> date == today.plusDays(1)
