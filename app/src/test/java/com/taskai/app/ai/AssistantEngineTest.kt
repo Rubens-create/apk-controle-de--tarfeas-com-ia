@@ -25,6 +25,59 @@ class AssistantEngineTest {
     @Before fun setup() {db=AppDatabase.createInMemory(ApplicationProvider.getApplicationContext<Context>());repo=TaskRepository(db)}
     @After fun close(){db.close()}
     private fun call(name:String,args:String)=ToolCall("fixture-call",name,JsonParser.parseString(args).asJsonObject)
+    @Test fun aNewUniqueQueryAndItsContextFollowupRemainValid() = runBlocking {
+        val c=repo.createConversation()
+        val a=repo.createTask(com.taskai.app.data.TaskEntity(title="Dentista"));val b=repo.createTask(com.taskai.app.data.TaskEntity(title="Farmácia"))
+        var turns=0
+        val first=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {turns++;return if(turns==1) AiReply("",listOf(call("search_tasks","""{"query":"Dentista"}"""))) else AiReply("OK")}}
+        AssistantEngine(repo,{AppSettings()},first).send(c.id,"Mostre Dentista")
+        turns=0
+        val second=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {turns++;return if(turns==1) AiReply("",listOf(call("search_tasks","""{"query":"Farmácia"}"""))) else AiReply("",listOf(ToolCall("u","update_task",com.google.gson.JsonObject().apply {addProperty("id",b.id);addProperty("priority","ALTA")})))}}
+        val changed=AssistantEngine(repo,{AppSettings()},second).send(c.id,"Prioridade alta para Farmácia")
+        assertTrue(changed.text.contains("Tarefa atualizada"));assertEquals("ALTA",repo.getTask(b.id)?.priority);assertEquals("MEDIA",repo.getTask(a.id)?.priority)
+        val followup=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray)=AiReply("",listOf(ToolCall("done","complete_task",com.google.gson.JsonObject().apply {addProperty("id",b.id)})))}
+        val done=AssistantEngine(repo,{AppSettings()},followup).send(c.id,"Pode concluir essa")
+        assertTrue(done.text.contains("Tarefa concluída"));assertEquals("COMPLETED",repo.getTask(b.id)?.status);assertEquals("PENDING",repo.getTask(a.id)?.status)
+    }
+    @Test fun creatingAfterAnAmbiguousReadStillReportsTheActualMutation() = runBlocking {
+        val c=repo.createConversation();repo.createTask(com.taskai.app.data.TaskEntity(title="A"));repo.createTask(com.taskai.app.data.TaskEntity(title="B"))
+        var turns=0
+        val read=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {turns++;return if(turns==1) AiReply("",listOf(call("list_tasks","{}"))) else AiReply("OK")}}
+        AssistantEngine(repo,{AppSettings()},read).send(c.id,"Mostre tarefas")
+        val create=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray)=AiReply("",listOf(call("create_task","""{"title":"Nova","due_date":"2026-11-19","due_time":"12:45","description":"Detalhe","priority":"ALTA","recurrence_rule":"FREQ=DAILY"}""")))}
+        val out=AssistantEngine(repo,{AppSettings()},create).send(c.id,"Crie Nova")
+        val saved=repo.listTasks().single {it.title=="Nova"}
+        listOf("Tarefa criada",saved.id,"2026-11-19","12:45","ALTA","PENDING","Detalhe","FREQ=DAILY").forEach {assertTrue("Missing verified mutation detail $it",out.text.contains(it))}
+        assertFalse(out.text.contains("Nenhuma alteração"));assertFalse(out.text.contains("Total:"));assertFalse(out.text.contains("Retornados:"))
+    }
+    @Test fun modelChosenGetByIdDoesNotResolveDuplicateTitles() = runBlocking {
+        val c=repo.createConversation()
+        val a=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-17"));val b=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-18"))
+        var turns=0
+        val fixture=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {
+            turns++;return if(turns==1) AiReply("",listOf(ToolCall("get","get_task",com.google.gson.JsonObject().apply {addProperty("id",a.id)}))) else AiReply("",listOf(ToolCall("u","complete_task",com.google.gson.JsonObject().apply {addProperty("id",a.id)})))
+        }}
+        val out=AssistantEngine(repo,{AppSettings()},fixture).send(c.id,"Conclua Reunião")
+        assertTrue(out.text.contains("ID"));assertTrue(out.text.contains(a.id));assertTrue(out.text.contains(b.id));assertTrue(repo.listTasks().all {it.status=="PENDING"})
+    }
+    @Test fun persistedAmbiguityCannotBeNarrowedByModelGetTaskAfterRecreation() = runBlocking {
+        val c=repo.createConversation()
+        val a=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-17"));val b=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-18"))
+        var turns=0
+        val readFixture=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {
+            turns++;return if(turns==1) AiReply("",listOf(call("list_tasks","{}"))) else AiReply("Selecione")
+        }}
+        AssistantEngine(repo,{AppSettings()},readFixture).send(c.id,"Mostre reuniões")
+        turns=0
+        val chooseFixture=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply {
+            turns++;return if(turns==1) AiReply("",listOf(ToolCall("get","get_task",com.google.gson.JsonObject().apply {addProperty("id",a.id)}))) else AiReply("",listOf(ToolCall("u","update_task",com.google.gson.JsonObject().apply {addProperty("id",a.id);addProperty("priority","ALTA")})))
+        }}
+        val out=AssistantEngine(repo,{AppSettings()},chooseFixture).send(c.id,"A prioridade deve ser alta")
+        assertTrue(out.text.contains("ID"));assertEquals("MEDIA",repo.getTask(a.id)?.priority);assertEquals("MEDIA",repo.getTask(b.id)?.priority)
+        val selectedFixture=object:AiProvider {override suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray)=AiReply("",listOf(ToolCall("selected","complete_task",com.google.gson.JsonObject().apply {addProperty("id",b.id)})))}
+        val selected=AssistantEngine(repo,{AppSettings()},selectedFixture).send(c.id,"Conclua o ID ${b.id}")
+        assertTrue(selected.text.contains("Tarefa concluída"));assertEquals("COMPLETED",repo.getTask(b.id)?.status);assertEquals("PENDING",repo.getTask(a.id)?.status)
+    }
     @Test fun ambiguousResolutionRoutesCannotAuthorizeAnArbitraryMutation() = runBlocking {
         val a=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-17"))
         val b=repo.createTask(com.taskai.app.data.TaskEntity(title="Reunião",dueDate="2026-11-18"))

@@ -42,8 +42,10 @@ time.sleep(1)
 (artifacts / 'dashboard-empty.png').write_bytes(command('exec-out', 'screencap', '-p', binary=True))
 tap_node(lambda n: n.get('content-desc') == 'Criar tarefa')
 tap_node(lambda n: n.get('class') == 'android.widget.EditText')
-title = 'Persistencia entre processos'
-command('shell', 'input', 'text', title.replace(' ', '%s'))
+title = 'Persistencia'
+time.sleep(.5)
+command('shell', 'input', 'text', title)
+time.sleep(.5)
 tap_node(lambda n: n.get('text') == 'Salvar tarefa')
 for _ in range(12):
     if not any(n.get('text') == 'Salvar tarefa' for n in screen().iter('node')):

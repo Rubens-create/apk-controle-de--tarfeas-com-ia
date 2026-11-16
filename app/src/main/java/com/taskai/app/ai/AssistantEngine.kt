@@ -30,6 +30,24 @@ class AssistantEngine(
         val now=java.time.ZonedDateTime.now(java.time.ZoneId.of(config.zoneId))
         val context="Você é o assistente TASK AI. Fale português brasileiro. Data/hora local: $now. Zona: ${config.zoneId}. Usuário: ${gson.toJson(config.userName)}. Use apenas ferramentas para acessar ou alterar dados reais. Nunca invente IDs, sucesso ou regras de expediente. Períodos vagos exigem perguntar o horário exato. Havendo ambiguidade, peça a seleção por ID. Exclusões exigem confirmação da interface; texto do modelo nunca confirma. Personalidade: ${config.personality}"
         val allReceipts=mutableListOf<JsonObject>()
+        // Carry unresolved candidate sets across turns/recreation. Only a user ID selection
+        // can clear them; a later model-selected get_task must not narrow them away.
+        val selectionReceipts=mutableListOf<JsonObject>()
+        var readInTurn=false
+        loadHistory(conversationId).dropLast(1).forEach {message ->
+            if(message.role=="user") {
+                readInTurn=false
+                if(taskCandidates(selectionReceipts).any {explicitId(message.content,it)}) selectionReceipts.clear()
+            }
+            if(message.role=="tool") {
+                val reads=taskReads(listOf(strictJson(message.content).asJsonObject))
+                if(reads.isNotEmpty()) {
+                    if(!readInTurn && !ambiguousTasks(selectionReceipts)) selectionReceipts.clear()
+                    selectionReceipts.addAll(reads);readInTurn=true
+                }
+            }
+        }
+        readInTurn=false
         val seen=mutableListOf<ToolCall>()
         repeat(4) {
             val raw=try {provider.reply(config,listOf(AiMessage("system",context))+loadHistory(conversationId),executor.definitions)}
@@ -51,6 +69,20 @@ class AssistantEngine(
                 require(selectedDeletes.distinct().size==selectedDeletes.size)
             } catch(_:IllegalArgumentException) {return@withLock finish(conversationId,"Não foi possível validar as ferramentas solicitadas. Nenhuma alteração foi realizada neste lote; confira os argumentos e IDs.")}
             if(reply.calls.any {call->ToolCatalog.mutates(call.name)} && reply.calls.any {call->!ToolCatalog.mutates(call.name)}) return@withLock finish(conversationId,"Consulte e selecione os IDs antes de alterar. Nenhuma alteração foi realizada neste lote.")
+            val targets=reply.calls.flatMap {call -> when(call.name) {
+                "update_task","complete_task","reopen_task" -> listOf(call.arguments["id"].asString)
+                "delete_task" -> call.arguments["ids"].asJsonArray.map {it.asString}
+                else -> emptyList()
+            }}
+            if(ambiguousTasks(selectionReceipts) && targets.any {!explicitId(text,it)}) return@withLock finish(conversationId,selectionPrompt(selectionReceipts))
+            for(target in targets.filterNot {explicitId(text,it)}) {
+                val selected=repository.getTask(target) ?: continue
+                val uniqueQuery=taskReads(selectionReceipts).any {r -> r["operation"].asString!="get_task" && !ambiguousTasks(listOf(r)) && taskCandidates(listOf(r))==setOf(target)}
+                if(!uniqueQuery && repository.listTasks().count {normalized(it.title)==normalized(selected.title)}>1) {
+                    val candidates=strictJson(executor.execute(ToolCall("selection-check","search_tasks",JsonObject().apply {addProperty("query",selected.title)}))).asJsonObject
+                    return@withLock finish(conversationId,selectionPrompt(listOf(candidates)))
+                }
+            }
             if(seen.size+reply.calls.size>12 || reply.calls.any {call -> seen.any {previous->previous.name==call.name && previous.arguments==call.arguments}}) return@withLock finish(conversationId,"Limite de ferramentas atingido. Nenhuma nova alteração foi realizada.")
             seen.addAll(reply.calls)
             recordCalls(conversationId,reply.calls,reply.geminiParts)
@@ -60,8 +92,12 @@ class AssistantEngine(
                 result
             }
             allReceipts.addAll(receipts)
-            val ambiguous=reply.calls.zip(receipts).find {pair -> pair.first.name=="search_tasks" && pair.second["ok"]?.asBoolean==true && pair.second["data"].asJsonArray.size()>1 && pair.second["data"].asJsonArray.none {item->text.contains(item.asJsonObject["id"].asString)} }
-            if(ambiguous!=null && looksMutation(text)) return@withLock finish(conversationId,"Encontrei mais de uma tarefa. Selecione o ID exato antes de alterar:\n"+render(ambiguous.second))
+            val reads=taskReads(receipts)
+            if(reads.isNotEmpty()) {
+                if(!readInTurn && !ambiguousTasks(selectionReceipts)) selectionReceipts.clear()
+                selectionReceipts.addAll(reads);readInTurn=true
+            }
+            if(reply.calls.none {ToolCatalog.mutates(it.name)} && ambiguousTasks(selectionReceipts) && looksMutation(text) && taskCandidates(selectionReceipts).none {explicitId(text,it)}) return@withLock finish(conversationId,selectionPrompt(selectionReceipts))
             val toConfirm=reply.calls.zip(receipts).filter {pair ->pair.second["pending_confirmation"]?.asBoolean==true}.map {pair ->PendingOperation(pair.first,pair.second.deepCopy())}
             if(toConfirm.isNotEmpty()) pending[conversationId]=toConfirm
             if(reply.calls.any {call ->ToolCatalog.mutates(call.name)} || receipts.any {r->r["ok"]?.asBoolean!=true}) return@withLock finish(conversationId,allReceipts.joinToString("\n") {r->render(r)},toConfirm.isNotEmpty())
@@ -132,6 +168,11 @@ class AssistantEngine(
     }
 
     private fun normalized(value:String)=java.text.Normalizer.normalize(value,java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"),"").lowercase(java.util.Locale.ROOT)
+    private fun taskReads(receipts:List<JsonObject>)=receipts.filter {it["ok"]?.asBoolean==true && it["operation"]?.asString in setOf("list_tasks","search_tasks","get_task")}
+    private fun taskCandidates(receipts:List<JsonObject>)=taskReads(receipts).flatMap {r -> val data=r["data"];(if(data.isJsonArray) data.asJsonArray.toList() else listOf(data)).map {it.asJsonObject["id"].asString}}.toSet()
+    private fun ambiguousTasks(receipts:List<JsonObject>)=taskCandidates(receipts).size>1 || taskReads(receipts).any {(it["total"]?.asInt ?: 0)>1 || it["has_more"]?.asBoolean==true}
+    private fun explicitId(text:String,id:String)=Regex("(?<![A-Za-z0-9_-])${Regex.escape(id)}(?![A-Za-z0-9_-])").containsMatchIn(text)
+    private fun selectionPrompt(receipts:List<JsonObject>)="Encontrei mais de uma tarefa. Selecione o ID exato antes de alterar. Nenhuma alteração foi realizada:\n"+taskReads(receipts).joinToString("\n") {render(it)}
     private fun looksMutation(value:String)=Regex("\\b(cri\\w*|adicion\\w*|agend\\w*|marc\\w*|apagu\\w*|exclu\\w*|delet\\w*|remov\\w*|alter\\w*|atualiz\\w*|mud\\w*|conclu\\w*|finaliz\\w*|reabr\\w*|cancel\\w*|create\\w*|update\\w*|delete\\w*|complete\\w*)\\b").containsMatchIn(normalized(value))
 
     private suspend fun finish(id:String,text:String,pending:Boolean=false):ChatOutcome {
