@@ -28,7 +28,7 @@ Suspend methods:
 - getMessages(conversationId:String):List<MessageEntity>
 - clearConversations()
 Use transaction for writes plus activity log; no SQL exposed to AI. Foreign keys for all relationships.
-Pure `TaskRules.validate(task)` throws IllegalArgumentException; `Recurrence.nextDate(date:LocalDate,rule:String):LocalDate`; `TaskFilters.apply(tasks:List<TaskEntity>,filter:String,today:LocalDate):List<TaskEntity>` filter ALL/TODAY/TOMORROW/UPCOMING/WEEK/OVERDUE/COMPLETED/UNDATED. Recurrence validation strict and rejects unsupported rule parts.
+Pure `TaskRules.validate(task)` throws IllegalArgumentException; `Recurrence.nextDate(date:LocalDate,rule:String):LocalDate`; `TaskFilters.apply(tasks:List<TaskEntity>,filter:String,today:LocalDate):List<TaskEntity>` filter ALL/PENDING/PRIORITY/TODAY/TOMORROW/UPCOMING/WEEK/OVERDUE/COMPLETED/UNDATED. Recurrence validation strict and rejects unsupported rule parts.
 
 ## infra/ (infrastructure agent owns)
 
@@ -39,7 +39,7 @@ Pure `TaskRules.validate(task)` throws IllegalArgumentException; `Recurrence.nex
 
 ## ai/ (AI agent owns)
 
-`ToolCall(id:String,name:String,arguments:JsonObject)`; `AiReply(text:String,calls:List<ToolCall>=emptyList())`; `AiMessage(role:String,content:String,toolCalls:List<ToolCall>=emptyList(),toolCallId:String?=null)`.
+`ToolCall(id:String,name:String,arguments:JsonObject)`; `AiReply(text:String,calls:List<ToolCall>=emptyList(),geminiParts:JsonArray?=null)`; `AiMessage(role:String,content:String,toolCalls:List<ToolCall>=emptyList(),toolCallId:String?=null,geminiParts:JsonArray?=null)`. Native Gemini parts, including signatures and order, are persisted for protocol replay only, bounded and never displayed as chat text.
 `interface AiProvider { suspend fun reply(settings:AppSettings,messages:List<AiMessage>,tools:JsonArray):AiReply }`
 `HttpAiProvider` implements OpenAI compatible, Anthropic, Gemini protocols, picks settings.provider OPENAI/COMPATIBLE/ANTHROPIC/GEMINI; no credentials hardcoded. Constructor optional OkHttpClient for tests. HTTPS except localhost in test; timeouts, bounds, no secret errors. test connection via `suspend fun testConnection(settings):String`.
 `ToolExecutor(repository:TaskRepository,zone:()->ZoneId={ZoneId.systemDefault()})` has `val definitions:JsonArray`, `suspend fun execute(call:ToolCall,confirmed:Boolean=false):String` JSON actual results or errors. Requires explicit IDs for updates/deletes; selection via search; delete_task ALWAYS requires confirmation unless confirmed parameter true, never trust model-supplied confirmation field. Handle category delete confirmation too. Unknown params rejected. All task schema fields use snake_case (due_date etc). list_projects/create_project/update_project/delete_project also supported.

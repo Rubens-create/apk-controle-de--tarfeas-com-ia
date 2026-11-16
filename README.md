@@ -2,6 +2,12 @@
 
 Aplicativo Android nativo para organizar tarefas offline e operar o banco local por um assistente com ferramentas controladas. Interface em português brasileiro, Kotlin, Jetpack Compose, Room e WorkManager.
 
+[![Android build](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/workflows/android-build.yml/badge.svg)](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/workflows/android-build.yml)
+
+## Entrega validada
+
+[Execução aprovada no Actions](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/runs/43918479590): **99 testes JVM e 18 testes Android aprovados**, lint e APK compilado. [Baixar APK dessa execução](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/runs/43918479590/artifacts/14254400142). A assinatura, a instalação local e a persistência após encerrar o processo também foram verificadas. Detalhes e limites: [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
 ## Requisitos
 
 - Android 8.0 (API 26) ou superior.
@@ -19,6 +25,8 @@ bash ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`. O APK de desenvolvimento usa o identificador `com.taskai.app.debug`, permitindo coexistir com a versão de produção.
+
+**Assinatura de testes:** runners diferentes podem gerar chaves debug diferentes. Exporte um backup antes de trocar de APK; pode ser necessário desinstalar uma versão com assinatura diferente. Para atualizar sem remover os dados, distribua Releases assinadas sempre com o mesmo keystore privado.
 
 O script opcional `python scripts/provision-local.py` baixa um JDK 17 e a distribuição Gradle em `.tooling/`, ignorada pelo Git. O SDK Android exige aceitar as licenças oficiais; então instale `platform-tools`, `platforms;android-35` e `build-tools;35.0.0` com `sdkmanager`. `source scripts/env.sh` configura esses caminhos locais no Git Bash. O wrapper é o caminho oficial e reproduzível em CI.
 
@@ -72,6 +80,8 @@ bash ./gradlew connectedDebugAndroidTest
 ```
 
 Testes JVM verificam regras, Room real via Robolectric, persistência, segurança de ferramentas, protocolos HTTP com servidor local de teste e falhas de rede. As respostas HTTP nos testes são fixtures explícitas, não um modo simulado do aplicativo. Testes de dispositivo exercitam a criação manual, recriação da Activity e a ausência de chave no assistente. Veja `docs/VERIFICATION.md` para não confundir testes locais com chamadas a um provedor pago ou execução no GitHub.
+
+Em um **emulador descartável**, `python scripts/device-verify.py` instala os APKs já compilados e executa a instrumentação sem manter um JVM Gradle na memória. `python scripts/process-persistence-smoke.py` cria uma tarefa pela UI e verifica sua permanência após `am force-stop`. Esses testes limpam os dados do pacote debug; não os use em uma instalação com dados que deseja preservar.
 
 ## GitHub Actions e versões
 

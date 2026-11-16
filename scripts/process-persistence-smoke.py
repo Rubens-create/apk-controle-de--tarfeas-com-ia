@@ -20,8 +20,13 @@ def command(*args, binary=False):
     return subprocess.check_output([str(adb), '-e', *args], text=not binary, timeout=45)
 
 def screen():
-    command('shell', 'uiautomator', 'dump', '/sdcard/taskai-test-ui.xml')
-    return ET.fromstring(command('shell', 'cat', '/sdcard/taskai-test-ui.xml'))
+    for _ in range(5):
+        command('shell', 'rm', '-f', '/sdcard/taskai-test-ui.xml')
+        result = command('shell', 'uiautomator', 'dump', '/sdcard/taskai-test-ui.xml')
+        if 'dumped' in result.lower():
+            return ET.fromstring(command('shell', 'cat', '/sdcard/taskai-test-ui.xml'))
+        time.sleep(.3)
+    raise AssertionError('Android UI hierarchy is not ready; stale coordinates were not used.')
 
 def tap_node(predicate):
     for _ in range(12):
@@ -46,6 +51,7 @@ title = 'Persistencia'
 time.sleep(.5)
 command('shell', 'input', 'text', title)
 time.sleep(.5)
+assert any(n.get('class') == 'android.widget.EditText' and n.get('text') == title for n in screen().iter('node')), 'UI typing did not deliver the test title.'
 tap_node(lambda n: n.get('text') == 'Salvar tarefa')
 for _ in range(12):
     if not any(n.get('text') == 'Salvar tarefa' for n in screen().iter('node')):
