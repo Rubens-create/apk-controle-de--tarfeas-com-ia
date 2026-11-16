@@ -34,10 +34,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
             IconButton(onClick = { history = true }, enabled = !chatting) { Icon(Icons.Outlined.History, "Histórico de conversas") }
             IconButton(onClick = { vm.newConversation() }, enabled = !chatting) { Icon(Icons.Outlined.AddComment, "Nova conversa") }
         }
-        if (settings.apiKey.isBlank()) OutlinedCard(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
-            Column(Modifier.padding(14.dp)) { Text("Conecte sua inteligência artificial", style = MaterialTheme.typography.titleSmall); Text("Informe uma chave de API nas configurações. Sem ela, o app não simula respostas nem executa pedidos por chat.", style = MaterialTheme.typography.bodySmall); TextButton(onClick = onSettings) { Text("Configurar IA") } }
-        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (settings.apiKey.isBlank()) item {
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) { Text("Conecte sua inteligência artificial", style = MaterialTheme.typography.titleSmall); Text("Informe uma chave de API nas configurações. Sem ela, o app não simula respostas nem executa pedidos por chat.", style = MaterialTheme.typography.bodySmall); TextButton(onClick = onSettings) { Text("Configurar IA") } }
+                }
+            }
             if (visible.isEmpty()) item {
                 EmptyState("Sua rotina, em uma conversa", "Peça para consultar ou organizar suas tarefas. Exclusões só acontecem com sua confirmação.", Icons.Outlined.AutoAwesome)
                 listOf("Quais são minhas tarefas de hoje?", "O que está atrasado?", "Ajude a planejar minha semana").forEach { suggestion ->

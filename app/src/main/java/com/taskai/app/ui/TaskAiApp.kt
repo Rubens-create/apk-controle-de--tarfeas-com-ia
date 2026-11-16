@@ -42,7 +42,7 @@ import java.time.*
     BackHandler(route != "home") { route = if (subpage) "more" else "home" }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbars) },
+        snackbarHost = { SnackbarHost(snackbars, modifier = Modifier.imePadding()) },
         topBar = {
             if (route != "home") TopAppBar(
                 title = { Text(when (route) { "tasks" -> "Suas tarefas"; "chat" -> "Assistente IA"; "calendar" -> "Calendário"; "more" -> "Seu espaço"; "settings" -> "Configurações"; "organize" -> "Categorias e projetos"; "logs" -> "Histórico de atividades"; else -> "Backup e restauração" }) },
