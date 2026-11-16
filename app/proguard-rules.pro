@@ -1,0 +1,6 @@
+-keepattributes Signature,*Annotation*
+-keep class com.taskai.app.data.** { *; }
+-keep class com.taskai.app.infra.AppSettings { *; }
+-keep class com.taskai.app.infra.Backup** { *; }
+-keep class com.taskai.app.ai.Ai** { *; }
+-keep class com.taskai.app.ai.ToolCall { *; }
