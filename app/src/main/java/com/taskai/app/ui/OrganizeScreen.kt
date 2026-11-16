@@ -226,8 +226,8 @@ private fun OrganizeEditor(
     val validColor = organizeHexPattern.matches(color.trim())
     val previewColor = organizeColor(color.trim(), MaterialTheme.colorScheme.primary)
 
-    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(.94f), shape = MaterialTheme.shapes.large) {
+    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Surface(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(.94f).systemBarsPadding().imePadding(), shape = MaterialTheme.shapes.large) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))

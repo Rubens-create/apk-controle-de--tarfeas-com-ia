@@ -36,8 +36,8 @@ import java.util.Locale
     val context = LocalContext.current
     val rules = listOf("" to "Não se repete", "FREQ=DAILY" to "Diariamente", "FREQ=WEEKLY" to "Semanalmente", "FREQ=MONTHLY" to "Mensalmente", "FREQ=YEARLY" to "Anualmente", "CUSTOM" to "Dias ou intervalo personalizado")
     var customRule by remember(task.id) { mutableStateOf(rule.isNotBlank() && rules.none { it.first == rule }) }
-    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(.94f).imePadding().heightIn(max = 740.dp), shape = MaterialTheme.shapes.large) {
+    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Surface(Modifier.fillMaxWidth(.94f).systemBarsPadding().imePadding().heightIn(max = 740.dp), shape = MaterialTheme.shapes.large) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(if (isNew) "Nova tarefa" else "Editar tarefa", style = MaterialTheme.typography.titleLarge)
