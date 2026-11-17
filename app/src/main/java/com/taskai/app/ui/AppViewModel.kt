@@ -11,6 +11,8 @@ import com.taskai.app.infra.AppSettings
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
+data class SpokenReplyEvent(val conversationId: String?, val text: String)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as TaskAiApplication
@@ -29,6 +31,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val busy = MutableStateFlow(false)
     val chatting = MutableStateFlow(false)
     val pendingConfirmation = MutableStateFlow(false)
+    val voicePreferenceSaving = MutableStateFlow(false)
+    private val _spokenReplies = MutableSharedFlow<SpokenReplyEvent>(extraBufferCapacity = 1)
+    val spokenReplies = _spokenReplies.asSharedFlow()
     val restorePreview = MutableStateFlow<String?>(null)
     private var importedJson: String? = null
 
@@ -58,6 +63,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun saveSettings(value: AppSettings) = action { app.settingsStore.save(value); notice.value = "Configurações salvas." }
     fun testConnection(value: AppSettings) = action { notice.value = HttpAiProvider().testConnection(value) }
 
+    fun setSpokenRepliesEnabled(enabled: Boolean) {
+        if (voicePreferenceSaving.value) return
+        voicePreferenceSaving.value = true
+        viewModelScope.launch {
+            try { withContext(Dispatchers.IO) { app.settingsStore.setSpokenRepliesEnabled(enabled) } }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { notice.value = "Não foi possível salvar a preferência de voz." }
+            finally { voicePreferenceSaving.value = false }
+        }
+    }
+
+    private suspend fun announce(id: String?, text: String) {
+        if (settings.value.spokenRepliesEnabled && text.isNotBlank()) {
+            _spokenReplies.emit(SpokenReplyEvent(id, text))
+        }
+    }
+
     fun selectConversation(id: String) { if (chatting.value) return; _conversation.value?.let(app.assistant::cancelPending); _conversation.value = id; pendingConfirmation.value = false }
     fun newConversation() = action {
         if (!chatting.value) { _conversation.value?.let(app.assistant::cancelPending); _conversation.value = repo.createConversation().id; pendingConfirmation.value = false }
@@ -71,8 +93,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val id = _conversation.value ?: repo.createConversation(text.take(60)).id.also { _conversation.value = it }
                 val result = app.assistant.send(id, text)
                 pendingConfirmation.value = result.pendingConfirmation
+                announce(id, result.spokenText)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { notice.value = e.message ?: "Falha ao consultar a IA. Nenhuma ação foi presumida." }
+            catch (e: Exception) {
+                val message = e.message ?: "Falha ao consultar a IA. Nenhuma ação foi presumida."
+                notice.value = message
+                announce(_conversation.value, message)
+            }
             finally { chatting.value = false }
         }
     }
@@ -81,7 +108,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (chatting.value) return
         viewModelScope.launch {
             chatting.value = true
-            try { val result = app.assistant.confirm(id); pendingConfirmation.value = result.pendingConfirmation }
+            try {
+                val result = app.assistant.confirm(id)
+                pendingConfirmation.value = result.pendingConfirmation
+                announce(id, result.spokenText)
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { pendingConfirmation.value = false; notice.value = e.message ?: "Falha na confirmação." }
             finally { chatting.value = false }

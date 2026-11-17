@@ -23,25 +23,37 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
     val chatting by vm.chatting.collectAsStateWithLifecycle()
     val pending by vm.pendingConfirmation.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val savingVoice by vm.voicePreferenceSaving.collectAsStateWithLifecycle()
     var text by rememberSaveable { mutableStateOf("") }
     var history by remember { mutableStateOf(false) }
+    val voice = rememberChatVoice(vm) { recognized ->
+        val message = listOf(text.trim(), recognized.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+        text = message
+        if (message.isNotEmpty()) {
+            vm.send(message)
+            if (vm.settings.value.apiKey.isNotBlank()) text = ""
+        }
+    }
+    val capturing = voice.state.listening || voice.state.processing
     val state = rememberLazyListState()
     val visible = messages.filter { it.role.lowercase() in listOf("user", "assistant") }
-    LaunchedEffect(visible.size, chatting, pending) { if (state.layoutInfo.totalItemsCount > 0) state.animateScrollToItem(state.layoutInfo.totalItemsCount - 1) }
+    LaunchedEffect(visible.size, chatting, pending, voice.state.listening, voice.state.processing, voice.error) { if (state.layoutInfo.totalItemsCount > 0) state.animateScrollToItem(state.layoutInfo.totalItemsCount - 1) }
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("${settings.provider.lowercase()} · ${settings.model}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            IconButton(onClick = { history = true }, enabled = !chatting) { Icon(Icons.Outlined.History, "Histórico de conversas") }
-            IconButton(onClick = { vm.newConversation() }, enabled = !chatting) { Icon(Icons.Outlined.AddComment, "Nova conversa") }
+            IconButton(onClick = { voice.cancel(); history = true }, enabled = !chatting && !capturing) { Icon(Icons.Outlined.History, "Histórico de conversas") }
+            IconButton(onClick = { voice.cancel(); vm.newConversation() }, enabled = !chatting && !capturing) { Icon(Icons.Outlined.AddComment, "Nova conversa") }
         }
+        SpokenRepliesSwitch(settings.spokenRepliesEnabled, savingVoice, voice.toggle)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item { Text("O microfone usa o serviço de voz do Android, que pode exigir internet. Somente a fala final é enviada à assistente.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (settings.apiKey.isBlank()) item {
                 OutlinedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) { Text("Conecte sua inteligência artificial", style = MaterialTheme.typography.titleSmall); Text("Informe uma chave de API nas configurações. Sem ela, o app não simula respostas nem executa pedidos por chat.", style = MaterialTheme.typography.bodySmall); TextButton(onClick = onSettings) { Text("Configurar IA") } }
                 }
             }
             if (visible.isEmpty()) item {
-                EmptyState("Sua rotina, em uma conversa", "Peça para consultar ou organizar suas tarefas. Exclusões só acontecem com sua confirmação.", Icons.Outlined.AutoAwesome)
+                EmptyState("Fale para organizar sua rotina", "Toque no microfone e conte o que precisa fazer. Se houver dúvida, a assistente pergunta. Você pode responder por voz ou texto.", Icons.Outlined.Mic)
                 listOf("Quais são minhas tarefas de hoje?", "O que está atrasado?", "Ajude a planejar minha semana").forEach { suggestion ->
                     OutlinedButton(onClick = { text = suggestion }, modifier = Modifier.fillMaxWidth()) { Text(suggestion) }
                 }
@@ -58,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
                 }
             }
             if (chatting) item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Text("Consultando e verificando...", style = MaterialTheme.typography.bodySmall) } }
+            item { ChatVoiceStatus(voice) }
             if (pending) item {
                 OutlinedCard { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Confirmação necessária", style = MaterialTheme.typography.titleSmall)
@@ -67,8 +80,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(text, { text = it }, modifier = Modifier.weight(1f), label = { Text("Mensagem para o assistente") }, maxLines = 4, enabled = !chatting && !pending, shape = RoundedCornerShape(20.dp))
-            FilledIconButton(onClick = { val message = text.trim(); if (message.isNotBlank()) { vm.send(message); text = "" } }, enabled = text.isNotBlank() && !chatting && !pending, modifier = Modifier.padding(bottom = 5.dp)) { Icon(Icons.AutoMirrored.Outlined.Send, "Enviar mensagem") }
+            OutlinedTextField(text, { text = it }, modifier = Modifier.weight(1f), label = { Text("Mensagem para o assistente") }, maxLines = 4, enabled = !chatting && !pending && !capturing, shape = RoundedCornerShape(20.dp))
+            FilledTonalIconButton(onClick = { if (voice.state.listening) voice.finish() else voice.begin() }, enabled = !chatting && !pending && !voice.state.processing, modifier = Modifier.padding(bottom = 5.dp)) {
+                Icon(if (voice.state.listening) Icons.Outlined.StopCircle else Icons.Outlined.Mic, if (voice.state.listening) "Parar e enviar áudio" else "Falar tarefa")
+            }
+            FilledIconButton(onClick = { val message = text.trim(); if (message.isNotBlank()) { voice.stopSpeaking(); vm.send(message); if (vm.settings.value.apiKey.isNotBlank()) text = "" } }, enabled = text.isNotBlank() && !chatting && !pending && !capturing, modifier = Modifier.padding(bottom = 5.dp)) { Icon(Icons.AutoMirrored.Outlined.Send, "Enviar mensagem") }
         }
     }
     if (history) AlertDialog(onDismissRequest = { history = false }, title = { Text("Conversas salvas") }, text = {

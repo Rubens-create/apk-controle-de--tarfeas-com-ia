@@ -1,12 +1,25 @@
 # Task AI
 
-Aplicativo Android nativo para organizar tarefas offline e operar o banco local por um assistente com ferramentas controladas. Interface em português brasileiro, Kotlin, Jetpack Compose, Room e WorkManager.
+Aplicativo Android nativo para organizar tarefas offline e conversar por voz ou texto com um assistente que usa ferramentas controladas. Interface em português brasileiro, Kotlin, Jetpack Compose, Room e WorkManager.
 
 [![Android build](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/workflows/android-build.yml/badge.svg)](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/workflows/android-build.yml)
 
-## Entrega validada
+## APKs e validação automática
 
-[Execução aprovada no Actions](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/runs/43918479590): **99 testes JVM e 18 testes Android aprovados**, lint e APK compilado. [Baixar APK dessa execução](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/runs/43918479590/artifacts/14254400142). A assinatura, a instalação local e a persistência após encerrar o processo também foram verificadas. Detalhes e limites: [docs/VERIFICATION.md](docs/VERIFICATION.md).
+[Ver execuções e baixar APKs](https://github.com/Rubens-create/apk-controle-de--tarfeas-com-ia/actions/workflows/android-build.yml). Cada push na main executa testes JVM, lint, compilação e testes Android. Os relatórios completos ficam nos artefatos verification-reports e device-test-reports. O registro da entrega anterior, sem entrada de voz, está em [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+## Comandos por voz (0.2.0)
+
+1. Configure seu provedor de IA e sua chave em **Mais > Configurações**.
+2. Abra **Assistente**, toque no microfone e permita seu uso no Android.
+3. Fale a tarefa naturalmente. Somente a transcrição final é enviada, automaticamente; a prévia parcial não executa nada. Durante a captura, use Cancelar áudio se não quiser enviar.
+4. Se faltar uma informação ou houver mais de uma tarefa possível, a assistente pergunta. Responda pelo microfone ou digitando, mantendo a mesma conversa.
+5. Ative **Respostas por voz**, no topo do chat, se quiser ouvir as respostas e as perguntas. O switch começa desligado, mantém sua preferência e é independente da entrada pelo microfone. Desligar ou sair do chat interrompe a reprodução. Mensagens antigas não são lidas ao abrir o histórico.
+6. Exclusões continuam exigindo o botão de confirmação da interface; o modelo não pode se autorizar a excluir.
+
+**Serviços do aparelho:** a entrada usa SpeechRecognizer do Android em pt-BR, preferindo reconhecimento no dispositivo quando disponível. O serviço padrão pode precisar de internet e processar áudio fora do aparelho. As respostas usam TextToSpeech e exigem uma voz em português instalada. Se esses serviços não estiverem disponíveis, o aplicativo informa o problema e mantém a digitação; não há transcrição ou fala simulada. O áudio bruto não é salvo no banco, apenas o texto da conversa. Não é necessária uma segunda chave de API para esses serviços Android.
+
+O desenho, os limites e os contratos estão em [docs/VOICE.md](docs/VOICE.md). Testes com callbacks controlados comprovam o fluxo e a segurança, não a qualidade acústica de um reconhecedor instalado no telefone.
 
 ## Requisitos
 

@@ -13,6 +13,7 @@ class ToolArgumentsTest {
 
     @Test fun catalogDefinesOnlyValidatedCrudAndReadToolsWithSnakeCaseFields() {
         val valid = mapOf(
+            "request_clarification" to """{"field":"title"}""",
             "create_task" to """{"title":"Reunião","due_date":"2026-11-17","due_time":"14:30","reminder_enabled":false}""",
             "update_task" to """{"id":"t","description":"Pauta"}""",
             "get_task" to """{"id":"t"}""", "complete_task" to """{"id":"t"}""", "reopen_task" to """{"id":"t"}""",

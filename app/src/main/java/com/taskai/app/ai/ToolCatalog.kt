@@ -19,7 +19,17 @@ internal object ToolCatalog {
     private val filter = Field("string", choices=listOf("ALL","TODAY","TOMORROW","UPCOMING","WEEK","OVERDUE","COMPLETED","UNDATED"))
     private val category = linkedMapOf("name" to Field("string", max=200), "color" to Field("string", max=7), "icon" to Field("string", max=100))
     private val project = linkedMapOf("name" to Field("string", max=200), "description" to str, "color" to Field("string", max=7))
+    val clarificationQuestions = linkedMapOf(
+        "title" to "Qual é o título da tarefa?",
+        "date" to "Para qual data você deseja a tarefa?",
+        "time" to "Qual horário exato você deseja? Pode dizer, por exemplo, às nove horas.",
+        "action" to "O que você deseja fazer com a tarefa?",
+        "task" to "Qual tarefa você deseja? Diga o título para eu consultar as opções.",
+        "recurrence" to "Como a tarefa deve se repetir?",
+        "details" to "Qual detalhe da tarefa você deseja informar ou alterar?"
+    )
     private val specs = linkedMapOf(
+        "request_clarification" to Spec("Pergunta UM item realmente incerto, sem alterar dados. Use sozinha; field escolhe a pergunta segura, sem texto livre.", mapOf("field" to Field("string", choices=clarificationQuestions.keys.toList())), setOf("field")),
         "list_tasks" to Spec("Lista tarefas reais por filtro e IDs; nunca assume horários.", mapOf("filter" to filter)),
         "search_tasks" to Spec("Pesquisa título/descrição. Vários resultados exigem esclarecer o ID antes de alterar.", mapOf("query" to Field("string",max=300)),setOf("query")),
         "get_task" to Spec("Consulta tarefa por ID exato.", mapOf("id" to id),setOf("id")),

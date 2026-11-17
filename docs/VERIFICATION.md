@@ -1,4 +1,6 @@
-# Verificação da entrega Android
+# Verificação da entrega Android 0.1.0 (anterior à voz)
+
+Este registro identifica o APK anterior, que recebe texto. Para a funcionalidade de voz da versão 0.2.0, consulte [VOICE.md](VOICE.md) e os relatórios da execução mais recente do GitHub Actions; não interprete os contadores históricos abaixo como prova de reconhecimento acústico.
 
 ## Execução aprovada
 

@@ -36,6 +36,10 @@ class ToolExecutor(private val repository: TaskRepository, private val zone: () 
     suspend fun execute(call: ToolCall, confirmed: Boolean = false): String {
         return try {
             ToolCatalog.validate(call)
+            if (call.name == "request_clarification") return JsonObject().apply {
+                addProperty("ok",true); addProperty("operation",call.name)
+                addProperty("field",call.arguments["field"].asString)
+            }.toString()
             if (call.name == "delete_task") {
                 val ids = call.arguments["ids"].asJsonArray.map { it.asString }
                 val selected = ids.map { requireNotNull(repository.getTask(it)) { "Tarefa não encontrada. Selecione novamente." } }

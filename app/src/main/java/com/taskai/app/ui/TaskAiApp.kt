@@ -65,7 +65,7 @@ import java.time.*
             }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { Icon(Icons.Outlined.Add, "Criar tarefa") }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Box(Modifier.fillMaxSize()) {
                 when (route) {

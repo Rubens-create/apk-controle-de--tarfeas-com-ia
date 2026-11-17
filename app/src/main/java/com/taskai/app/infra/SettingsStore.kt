@@ -30,6 +30,7 @@ data class AppSettings(
     val endpoint: String = "https://api.openai.com/v1",
     val personality: String = "Seja objetivo, gentil e fale português brasileiro.",
     val temperature: Double = 0.3,
+    val spokenRepliesEnabled: Boolean = false,
     val apiKey: String = ""
 ) {
     // Do not let generated data-class diagnostics leak the credential.
@@ -52,6 +53,10 @@ class SettingsStore internal constructor(context: Context, private val secrets: 
             .putString("encryptedKey", encrypted)
             .commit()) { "Não foi possível salvar as configurações." }
         state.value = settings
+    }
+
+    @Synchronized fun setSpokenRepliesEnabled(enabled: Boolean) {
+        save(state.value.copy(spokenRepliesEnabled = enabled))
     }
 
     private fun load(): AppSettings {
